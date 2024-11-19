@@ -54,3 +54,13 @@ class ContactSerializer(serializers.ModelSerializer):
         # Automatically set the user to the currently authenticated user
         validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
+
+class SpamReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SpamReport
+        fields = ['id', 'phone_number']
+    
+    def create(self, validated_data):
+        # Automatically set the user to the currently authenticated user
+        validated_data['reported_by'] = self.context['request'].user
+        return super().create(validated_data)
