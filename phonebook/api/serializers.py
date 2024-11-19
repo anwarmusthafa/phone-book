@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import CustomUser
+from .models import CustomUser, Contact, SpamReport
 
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
@@ -44,3 +44,13 @@ class UserSerializer(serializers.ModelSerializer):
         user.set_password(password)  # Hash the password before saving
         user.save()  # Save the user with the hashed password
         return user
+
+class ContactSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contact
+        fields = ['id', 'name', 'phone_number']
+    
+    def create(self, validated_data):
+        # Automatically set the user to the currently authenticated user
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)

@@ -35,4 +35,24 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     REQUIRED_FIELDS = ['name', 'email']
 
     def __str__(self):
-        return self.phone_number
+        return f"{self.phone_number} - {self.name}"
+
+class Contact(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    name = models.CharField(max_length=150)
+    phone_number = models.CharField(max_length=15)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'phone_number')
+    def __str__(self):
+        return f"{self.phone_number} - {self.name}"
+
+class SpamReport(models.Model):
+    phone_number = models.CharField(max_length=15, unique=False)
+    reported_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class meta:
+        unique_together = ('phone_number', 'reported_by')
+    
