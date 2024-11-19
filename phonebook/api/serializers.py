@@ -64,3 +64,5 @@ class SpamReportSerializer(serializers.ModelSerializer):
         # Automatically set the user to the currently authenticated user
         validated_data['reported_by'] = self.context['request'].user
         return super().create(validated_data)
+
+

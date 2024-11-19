@@ -106,7 +106,7 @@ DATABASES = {
 AUTH_USER_MODEL = 'api.CustomUser'
 
 AUTHENTICATION_BACKENDS = [
-    'accounts.authentication.PhoneNumberBackend',
+    'api.authentication.PhoneNumberBackend',
     'django.contrib.auth.backends.ModelBackend',  # keep this to allow regular login if needed
 ]
 

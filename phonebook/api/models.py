@@ -55,4 +55,8 @@ class SpamReport(models.Model):
 
     class meta:
         unique_together = ('phone_number', 'reported_by')
-    
+
+class GlobalDatabase(models.Model):
+    name = models.CharField(max_length=150)
+    phone_number = models.CharField(max_length=15)
+    created_at = models.DateTimeField(auto_now_add=True)
