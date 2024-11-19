@@ -15,7 +15,6 @@ class LoginSerializer(serializers.Serializer):
         phone_number = attrs.get('phone_number')
         password = attrs.get('password')
 
-        # Try to authenticate the user
         user = get_user_model().objects.filter(phone_number=phone_number).first()
         
         if not user:
@@ -24,7 +23,6 @@ class LoginSerializer(serializers.Serializer):
         if not user.check_password(password):
             raise serializers.ValidationError("Incorrect password.")
 
-        # If the user is authenticated, generate tokens
         tokens = RefreshToken.for_user(user)
         return {
             'access': str(tokens.access_token),
@@ -34,9 +32,9 @@ class LoginSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
-        model = CustomUser  # Your custom user model
+        model = CustomUser  
         fields = ['id', 'name', 'phone_number', 'password']
-        extra_kwargs = {'password': {'write_only': True}}  # Ensures password is not returned in responses
+        extra_kwargs = {'password': {'write_only': True}} 
 
     def create(self, validated_data):
         password = validated_data.pop('password')  # Remove password from validated data

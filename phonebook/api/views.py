@@ -28,14 +28,22 @@ class HomeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        print(request.user)
         return Response({"message": "Hello World!"}, status=status.HTTP_200_OK)
 
 
-class AddContactView(APIView):
+class ContactView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        contacts = Contact.objects.filter(user=request.user)
+        serializer = ContactSerializer(contacts, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     def post(self, request):
+        phone_number = request.data.get('phone_number', '')
+        if not phone_number.isdigit():
+            return Response({'detail': 'Phone number must be a digit'}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = ContactSerializer(
             data=request.data,
             context={'request': request}
@@ -50,6 +58,7 @@ class AddContactView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class SpamReportView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -61,73 +70,98 @@ class SpamReportView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class SearchByNameView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, name):
         try:
-        
-            starts_with_query = GlobalDatabase.objects.filter(name__istartswith=name)
-            
-           
-            contains_query = GlobalDatabase.objects.filter(
+            starts_with_query = CustomUser.objects.filter(name__istartswith=name)
+            contact_starts_with_query = Contact.objects.filter(name__istartswith=name, user=request.user)
+
+            # Search for users whose name contains the search string but doesn't start with it
+            contains_query = CustomUser.objects.filter(
                 Q(name__icontains=name) & ~Q(name__istartswith=name)
             )
 
-            
-            results = list(starts_with_query) + list(contains_query)
+            # Search for contacts whose name contains the search string but doesn't start with it
+            contact_contains_query = Contact.objects.filter(
+                Q(name__icontains=name) & ~Q(name__istartswith=name), user=request.user
+            )
 
-            
+            # Combine results from both queries
+            results = list(starts_with_query) + list(contact_starts_with_query) + \
+                     list(contains_query) + list(contact_contains_query)
+
+            # Prepare the response data
             response_data = []
             for result in results:
-                spam_reports_count = SpamReport.objects.filter(phone_number=result.phone_number).count()
-                
-                response_data.append({
-                    "name": result.name,
-                    "phone_number": result.phone_number,
-                    "spam_reports_count": spam_reports_count 
-                })
+                if isinstance(result, CustomUser):
+                    spam_reports_count = SpamReport.objects.filter(phone_number=result.phone_number).count()
+                    response_data.append({
+                        "name": result.name,
+                        "phone_number": result.phone_number,
+                        "spam_reports_count": spam_reports_count
+                    })
+                elif isinstance(result, Contact):
+                    spam_reports_count = SpamReport.objects.filter(phone_number=result.phone_number).count()
+                    response_data.append({
+                        "name": result.name,
+                        "phone_number": result.phone_number,
+                        "spam_reports_count": spam_reports_count
+                    })
 
-            return Response(response_data, status=200)
+            return Response(response_data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"error": str(e)}, status=400)
-        
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class SearchByPhoneNumberView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, phone_number):
         try:
-            
-            registered_user = CustomUser.objects.filter(phone_number=phone_number).first()
-            
             response_data = []
-
+            registered_user = CustomUser.objects.filter(phone_number=phone_number).first()
             if registered_user:
-                
                 is_in_contact_list = Contact.objects.filter(user=request.user, phone_number=phone_number).exists()
 
-                response_data.append({
-                    "name": registered_user.name,
-                    "phone_number": registered_user.phone_number,
-                    "email": registered_user.email if is_in_contact_list else None,
-                    "spam_reports_count": SpamReport.objects.filter(phone_number=phone_number).count(),
-                })
-            else:
-                
-                global_results = GlobalDatabase.objects.filter(phone_number=phone_number)
-
-                for result in global_results:
+                if is_in_contact_list:
                     response_data.append({
-                        "name": result.name,
-                        "phone_number": result.phone_number,
+                        "name": registered_user.name,
+                        "phone_number": registered_user.phone_number,
+                        "email": registered_user.email,
+                        "spam_reports_count": SpamReport.objects.filter(phone_number=phone_number).count(),
+                    })
+                else:
+                    response_data.append({
+                        "name": registered_user.name,
+                        "phone_number": registered_user.phone_number,
                         "spam_reports_count": SpamReport.objects.filter(phone_number=phone_number).count(),
                     })
 
-            return Response(response_data, status=200)
+            else:
+                contact = Contact.objects.filter(user=request.user, phone_number=phone_number).first()
+
+                if contact:
+                    response_data.append({
+                        "name": contact.name,
+                        "phone_number": contact.phone_number,
+                        "email": contact.user.email,
+                        "spam_reports_count": SpamReport.objects.filter(phone_number=phone_number).count(),
+                    })
+                else:
+                    response_data.append({
+                        "name": contact.name,
+                        "phone_number": contact.phone_number,
+                        "spam_reports_count": SpamReport.objects.filter(phone_number=phone_number).count(),
+                    })
+
+            if not response_data:
+                return Response({"detail": "No results found."}, status=status.HTTP_404_NOT_FOUND)
+
+            return Response(response_data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({"error": str(e)}, status=400)
-    
-
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
